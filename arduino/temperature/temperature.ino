@@ -44,7 +44,6 @@ void UpdateRGB (byte);
 void Cal_temp_f (int&, byte&);
 void Dis_7SEG_Timer();
 void Light_Changing();
-void Clear_Before_Timer();
 
 bool Working = true;
 int Timer_Counter = -1;
@@ -401,26 +400,6 @@ void Dis_7SEG_Timer() {
   Send7SEG (Digit,NumberLookup[Number]);
   Digit--;
   
-}
-
-/***************************************************************************
- Function Name: Clear_Before_Timer
-
- Purpose: 
-   Flash show 0 at final digit for four times before timer starts.
-****************************************************************************/
-void Clear_Before_Timer() {
-  int i = 0;
-  while (i < 8) {
-    Send7SEG (4,0x0);
-    Send7SEG (3,0x0);
-    Send7SEG (2,0x0);
-    Send7SEG (1,0x0);
-    delay(500);
-    Send7SEG (1,NumberLookup[0]);
-    delay(500);
-    i++;
-  }
 }
 
 /***************************************************************************
