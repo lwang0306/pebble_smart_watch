@@ -1,12 +1,3 @@
-/* 
-Server code primarily comes from 
-http://www.prasannatech.net/2008/07/socket-programming-tutorial.html
-and
-http://www.binarii.com/files/papers/c_sockets.txt
-*/
-
-// Group 7: Yue Chen, Linjie Peng, Luyao Wang
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -21,28 +12,182 @@ http://www.binarii.com/files/papers/c_sockets.txt
 #include <fcntl.h>
 #include <signal.h>
 #include <termios.h>
+#include <queue>
+#include <string.h>
+#include <limits>
+#include <cfloat>
+#include <float.h>
 
 using namespace std;
 
 // global variables
+char* ARDUINO_PORT;
 int exit_code;
 pthread_mutex_t lock_exit;
 int successful_pages;
 int failed_pages;
 int total_bytes;
+bool zero_byte_times;
 
-// char* ARDUINO_PORT;
+std::queue<float> temperatures;
+float average = 0;
+float highest = FLT_MIN;
+float lowest = FLT_MAX;
+char all_msg [200];
+int size = 3600;
+bool full = false;
+char num_msg[200];
 char message[200];
 char previous [50] = "{\n\"name\": \"\0";
 char after [20] = "\"\n}\n\0";
+char before_average[20] = "Average: ";
+char before_high[20] = "#Highest: ";
+char before_low[20] = "#Lowest: ";
 pthread_mutex_t lock_message;
 int arduino; 
-int running = 1; // a flag indicating if print_message is running, default 1 indicates running
+int running = 1;
 
+void updateAverage(float, float);
+void updateLowest(float, float);
+void updateHighest(float, float);
 char* get_information_from_request(char*, char*);
 int start_server(int);
 void* read_input_from_console(void*);
 void* read_from_arduino(void*);
+
+void updateQueue() {
+	//std::size_t offset = 0;
+	float celcius = 0;
+	float current = 0;
+	float previous = 0;
+	//m = std::stod(&data[2], &offset);
+	if (num_msg[0] != '\0' && num_msg[0] != '\n') {
+		string str(num_msg);
+		int index_of_c_f = str.length() - 1;
+         while (num_msg[index_of_c_f] == '\n') {
+          index_of_c_f--;
+        }
+		char unit = str.at(index_of_c_f);
+		if (unit == 'C') {
+			celcius = atof(num_msg);
+			temperatures.push(celcius);
+		} else {
+			float fahrenheit = atof(num_msg);
+			celcius = (fahrenheit - 32) * 5 / 9;
+			temperatures.push(celcius);
+		}
+		if (temperatures.size() > size) {
+			full = true;
+			previous = temperatures.front();
+			temperatures.pop();
+		}
+		current = celcius;
+		//cout << "Now the temperature is " << current << endl;
+		updateAverage(previous, current);
+		updateLowest(previous, current);
+		updateHighest(previous, current);
+	}
+}
+
+void updateAverage(float previous, float current) {
+	//string str(num_msg);
+	if (num_msg[0] != '\0') {
+		if (temperatures.size() < size) {
+
+			float total = average * (temperatures.size() - 1) + current;
+			average = total / temperatures.size();
+		} else {
+			if (full) {
+				float total = average * size + current - previous;
+				average = total / size;
+			} else {
+				float total = average * (temperatures.size() - 1) + current;
+				average = total / temperatures.size();
+			}
+		}
+	}
+	// cout << "The average now is "<< average << endl;
+}
+
+void updateLowest(float previous, float current) {
+	if (num_msg[0] != '\0') {
+		if (temperatures.size() < size) {
+			if (current < lowest) lowest = current;
+		} else {
+			if (full) {
+				if (previous != lowest) {
+					if (current < lowest) lowest = current;
+				} else {
+					lowest = FLT_MAX;
+					std::queue<float> newTemperatures;
+					while (temperatures.size() > 0) {
+						float first = temperatures.front();
+						if (first < lowest) lowest = first;
+						temperatures.pop();
+						newTemperatures.push(first);
+					}
+					temperatures = newTemperatures;
+				}
+			} else {
+				if (current < lowest) lowest = current;
+			}
+		}
+	}
+	// cout << "The lowest now is " << lowest << endl;
+}
+
+void updateHighest(float previous, float current) {
+	if (num_msg[0] != '\0') {
+		if (temperatures.size() < size) {
+			if (current > highest) highest = current;
+		} else {
+			if (full) {
+				if (previous != highest) {
+					if (current > highest) highest = current;
+				} else {
+					highest = FLT_MIN;
+					std::queue<float> newTemperatures;
+					while (temperatures.size() > 0) {
+						float first = temperatures.front();
+						if (first > highest) highest = first;
+						temperatures.pop();
+						newTemperatures.push(first);
+					}
+					temperatures = newTemperatures;
+				}
+			} else {
+				if (current > highest) highest = current;
+			}
+		}
+	}
+	// cout << "The highest now is " << highest << endl;
+}
+
+
+
+// int main() {
+// 	strcpy(all_msg, "26.67 c");
+// 	updateQueue();
+// 	strcpy(all_msg, "87.75 f");
+// 	updateQueue();
+// 	strcpy(all_msg, "32.24 c");
+// 	updateQueue();
+// 	strcpy(all_msg, "75.25 f");
+// 	updateQueue();
+// 	strcpy(all_msg, "25.55 c");
+// 	updateQueue();
+// 	strcpy(all_msg, "15.66 c");
+// 	updateQueue();
+// 	strcpy(all_msg, "22.30 c");
+// 	updateQueue();
+// 	// while (temperatures.size() > 0) {
+// 	// 	float first = temperatures.front();
+// 	// 	cout << "The first one is now "<< first << endl;
+// 	// 	temperatures.pop();
+// 	// }
+// 	return 0;
+// }
+
 
 
 char* get_information_from_request(char* request, char* filename)
@@ -123,7 +268,19 @@ int start_server(int PORT_NUMBER)
   	
   	int fd = accept(sock, (struct sockaddr *)&client_addr,(socklen_t *)&sin_size);
   	printf("Server got a connection from (%s, %d)\n", inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
-  	
+
+  	if (zero_byte_times) {
+  	  zero_byte_times = false;
+  	  cout << "------------------------ Arduino Disconntected" << endl;
+  	  all_msg[0] = '\0';
+      strcat(all_msg, previous);
+      strcat(all_msg, "Arduino#Disconnected");
+      strcat(all_msg, after); 
+      send_message(fd, all_msg);
+      close(fd);
+      continue;
+  	}
+
   // buffer to read data into
   	char request[1024];
   	
@@ -160,11 +317,14 @@ int start_server(int PORT_NUMBER)
   	}
 
     // case and error handling
-    if (strcmp(filename_tail, "resume") == 0) {
+    if (strcmp(filename_tail, "resume") == 0 || strcmp(filename_tail, "polling") == 0) {
       write(arduino, "1", 1);
-      char all_msg [200];
+      // char all_msg [200];
       all_msg[0] = '\0';
       strcat(all_msg, previous);
+      if (strcmp(filename_tail, "polling") == 0) {
+      	strcat(all_msg, "Polling#");
+      }
       pthread_mutex_lock(&lock_message);
       int index = strlen(message) - 1;
       while (message[index] == '\n') {
@@ -176,16 +336,15 @@ int start_server(int PORT_NUMBER)
       strcat(all_msg, after); 
       send_message(fd, all_msg);
     } else if (strcmp(filename_tail, "pause") == 0) {
-      write(arduino, "2", 1);
-      char all_msg [200];
+      write(arduino, "2", 1);      
       all_msg[0] = '\0';
       strcat(all_msg, previous);
-      strcat(all_msg, "Pause!");
+      strcat(all_msg, "paused");
       strcat(all_msg, after); 
       send_message(fd, all_msg);
     } else if (strcmp(filename_tail, "celsius") == 0) {
       write(arduino, "3", 1);
-      char all_msg [200];
+      // char all_msg [200];
       all_msg[0] = '\0';
       strcat(all_msg, previous);
       pthread_mutex_lock(&lock_message);
@@ -200,7 +359,7 @@ int start_server(int PORT_NUMBER)
       send_message(fd, all_msg);
     } else if (strcmp(filename_tail, "fahrenheit") == 0) {
       write(arduino, "4", 1);
-      char all_msg [200];
+      // char all_msg [200];
       all_msg[0] = '\0';
       strcat(all_msg, previous);
       pthread_mutex_lock(&lock_message);
@@ -213,8 +372,73 @@ int start_server(int PORT_NUMBER)
       pthread_mutex_unlock(&lock_message);
       strcat(all_msg, after); 
       send_message(fd, all_msg);
-    } else { // error, no existing URL in protocol
+    } else if (strcmp(filename_tail, "light") == 0) {
+    	write(arduino, "5", 1);
+    	all_msg[0] = '\0';
+        strcat(all_msg, previous);
+        strcat(all_msg, "fling!");
+        strcat(all_msg, after); 
+        send_message(fd, all_msg);
+    } else if (strcmp(filename_tail, "timer") == 0) {
+    	write(arduino, "6", 1);
+    	all_msg[0] = '\0';
+        strcat(all_msg, previous);
+        strcat(all_msg, "timer!");
+        strcat(all_msg, after); 
+        send_message(fd, all_msg);
+    } else if (strcmp(filename_tail, "statf") == 0) {
+    	write(arduino, "7", 1);
+    	all_msg[0] = '\0';
+        strcat(all_msg, previous);
+        // average
+        strcat(all_msg, before_average);
+        float average_f = average * 9 / 5 + 32;
+        string str_average = to_string(average_f);
+        str_average.erase(str_average.find_last_not_of("0") + 1);
+        strcat(all_msg, str_average.c_str());
+        strcat(all_msg, " F");
+        // highest
+        strcat(all_msg, before_high);
+        float highest_f = highest * 9 / 5 + 32;
+        string str_high = to_string(highest_f);
+        str_high.erase(str_high.find_last_not_of("0") + 1);
+        strcat(all_msg, str_high.c_str());
+        strcat(all_msg, " F");
+        // lowest
+        strcat(all_msg, before_low);
+        float lowest_f = lowest * 9 / 5 + 32;
+        string str_low = to_string(lowest_f);
+        str_low.erase(str_low.find_last_not_of("0") + 1);
+        strcat(all_msg, str_low.c_str());
+        strcat(all_msg, " F");
+        
+        strcat(all_msg, after); 
+        send_message(fd, all_msg);
+    } else if (strcmp(filename_tail, "statc") == 0) {
+    	write(arduino, "8", 1);
+    	all_msg[0] = '\0';
+        strcat(all_msg, previous);
+        // average
+        strcat(all_msg, before_average);
+        string str_average = to_string(average);
+        str_average.erase(str_average.find_last_not_of("0") + 1);
+        strcat(all_msg, str_average.c_str());
+        strcat(all_msg, " C");
+        // highest
+        strcat(all_msg, before_high);
+        string str_high = to_string(highest);
+        str_high.erase(str_high.find_last_not_of("0") + 1);
+        strcat(all_msg, str_high.c_str());
+        strcat(all_msg, " C");
+        // lowest
+        strcat(all_msg, before_low);
+        string str_low = to_string(lowest);
+        str_low.erase(str_low.find_last_not_of("0") + 1);
+        strcat(all_msg, str_low.c_str());
+        strcat(all_msg, " C");
 
+        strcat(all_msg, after); 
+        send_message(fd, all_msg);
     }
 
   	free(filename_tail);
@@ -252,10 +476,11 @@ void* read_input_from_console(void* p)
 void* read_from_arduino(void* p) {
   // open the connection
   // cout << ARDUINO_PORT << endl;
-  arduino = open("/dev/cu.usbmodem1431", O_RDWR);
+  arduino = open(ARDUINO_PORT, O_RDWR);
   // cout << "arduino = " << arduino << endl;
   // if open returns -1, something went wrong!
   if (arduino == -1) return NULL;
+  bool is_garbage = true;
 
   // then configure it
   struct termios options;
@@ -276,6 +501,9 @@ void* read_from_arduino(void* p) {
   while (1) {
     pthread_mutex_trylock(&lock_message);
      int bytes_read = read(arduino, buf, 100);
+     if (bytes_read == -1) {
+     	zero_byte_times = true;
+     }
      if (bytes_read != 0) {
         buf[bytes_read] = '\0';
 
@@ -286,6 +514,11 @@ void* read_from_arduino(void* p) {
         strcat(message, buf);
         if (buf[bytes_read - 1] == '\n') {
           flag = 1;
+          if (!is_garbage) {
+          	strcpy(num_msg, message);
+          	updateQueue();
+          	num_msg[0] = '\0';
+          }         
           pthread_mutex_unlock(&lock_message);
           pthread_mutex_lock(&lock_exit);
           if (exit_code == 1) {
@@ -296,6 +529,7 @@ void* read_from_arduino(void* p) {
             break;
           }
           pthread_mutex_unlock(&lock_exit);
+          is_garbage = false;
         }
      }
   }
@@ -315,11 +549,14 @@ int main(int argc, char *argv[])
 	}
 
 	exit_code = 0;
+	zero_byte_times = false;
 	successful_pages = 0;
 	failed_pages = 0;
 	total_bytes = 0;
+	num_msg[0] = '\0';
 	int PORT_NUMBER = atoi(argv[1]);
   // ARDUINO_PORT = argv[2];
+	ARDUINO_PORT = "/dev/cu.usbmodem1431";
 
 	pthread_mutex_init(&lock_exit, NULL);
   pthread_mutex_init(&lock_message, NULL);
@@ -333,4 +570,3 @@ int main(int argc, char *argv[])
   pthread_join(t1, NULL);
 
 }
-
