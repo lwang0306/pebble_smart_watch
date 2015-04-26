@@ -42,8 +42,12 @@ void Send7SEG (byte, byte);
 void SerialMonitorPrint (byte, int, bool, bool);
 void UpdateRGB (byte);
 void Cal_temp_f (int&, byte&);
+void Dis_7SEG_Timer();
+void Light_Changing();
 
 bool Working = true;
+int Timer_Counter = -1;
+int Light_Counter = -1;
 
 /***************************************************************************
  Function Name: setup
@@ -115,6 +119,8 @@ void loop()
     Wire.endTransmission();
     delay (250);
   }
+   
+  int swallow = 0;
   
   while (1)
   {
@@ -135,10 +141,24 @@ void loop()
       SerialMonitorPrint (Temperature_H, Decimal, IsPositive, IsFahrenheit);
     
       /* Update RGB LED.*/
-      UpdateRGB (Temperature_H);
+      if (Light_Counter >= 0) { // in light changing mode
+        Light_Changing();
+      } else { // not in light changing mode
+        UpdateRGB (Temperature_H);
+      }
+      
     
-      /* Display temperature on the 7-Segment */
-      Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive, IsFahrenheit);
+      /* Display temperature or timer on the 7-Segment */ 
+      if (Timer_Counter >= 0) { // in timer mode
+        Dis_7SEG_Timer();
+        if (swallow > 1) {
+          Timer_Counter++;
+        } else {
+          swallow++;
+        }
+      } else { // not in timer mode
+        Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive, IsFahrenheit);
+      }
     
       delay (1000);        /* Take temperature read every 1 second */
     }
@@ -149,19 +169,60 @@ void loop()
       
       // if input is '3' - Celsius mode
       if (input == 51) {
+        Timer_Counter = -1;
         IsFahrenheit = false;
       } else if (input == 52) { // if input is '4' - Fahrenheit mode
+        Timer_Counter = -1;
         IsFahrenheit = true;
       } else if (input == 50) { // if input is '2' - Pause mode
+        Timer_Counter = -1;
         Working = false;
         Dis_7SEG(0, 0, 0, true, false);
       } else if (input == 49) { // if input is '1' - Resume mode
+        Timer_Counter = -1;
         Working = true;
+      } else if (input == 54) { // if input is '6' - Timer mode
+        swallow = 0;
+        Timer_Counter++;
+      } else if (input == 53) { // if input is '5' - Light mode
+        Light_Counter++;
       }
       
     }
   }
 } 
+
+
+void Light_Changing() {
+  
+  if (Light_Counter % 4 == 0) { // no color
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
+  }
+  if (Light_Counter % 4 == 1) { // red
+    digitalWrite(RED, HIGH);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, LOW);
+  }
+  if (Light_Counter % 4 == 2) { // green
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, HIGH);
+    digitalWrite(BLUE, LOW);
+  }
+  if (Light_Counter % 4 == 3) { // blue
+    digitalWrite(RED, LOW);
+    digitalWrite(GREEN, LOW);
+    digitalWrite(BLUE, HIGH);
+  }
+  if (Light_Counter >= 8) {
+    Light_Counter = -1;
+  } else {
+    Light_Counter++;
+  }
+  
+}
+
 
 /***************************************************************************
  Function Name: Cal_temp
@@ -276,6 +337,69 @@ void Dis_7SEG (int Decimal, byte High, byte Low, bool sign, bool IsFahrenheit)
     Send7SEG (Digit,0x00);
     Digit--;    
   }  
+}
+
+/***************************************************************************
+ Function Name: Dis_7SEG_Timer
+
+ Purpose: 
+   Display timer on the 7-segment display.
+****************************************************************************/
+void Dis_7SEG_Timer() {
+  byte Digit = 4;                 /* Number of 7-Segment digit */
+  byte Number;                    /* Temporary variable hold the number to display */
+  int Counter = Timer_Counter;
+  
+  if (!Working) {
+    while (Digit > 0)                 /* Clear the rest of the digit */
+    {
+      Send7SEG (Digit,0x40);
+      Digit--;    
+    }
+    return;
+  }
+  
+  if (Counter > 9999) {
+    Counter = Counter % 10000;
+  }
+  
+  if (Counter > 999) {
+    Number = Counter / 1000;
+    Send7SEG (Digit,NumberLookup[Number]);
+    Counter = Counter % 1000;
+  } else if (Timer_Counter < 1000) {
+    Send7SEG (Digit,0x0);
+  } else {
+    Send7SEG (Digit,NumberLookup[0]);
+  }
+  Digit--;
+  
+  if (Counter > 99) {
+    Number = Counter / 100;
+    Send7SEG (Digit,NumberLookup[Number]);
+    Counter = Counter % 100;
+  } else if (Timer_Counter < 100) {
+    Send7SEG (Digit,0x0);
+  } else {
+    Send7SEG (Digit,NumberLookup[0]);
+  }
+  Digit--;
+  
+  if (Counter > 9) {
+    Number = Counter / 10;
+    Send7SEG (Digit,NumberLookup[Number]);
+    Counter = Counter % 10;
+  } else if (Timer_Counter < 10) {
+    Send7SEG (Digit,0x0);
+  } else {
+    Send7SEG (Digit,NumberLookup[0]);
+  }
+  Digit--;
+  
+  Number = Counter;
+  Send7SEG (Digit,NumberLookup[Number]);
+  Digit--;
+  
 }
 
 /***************************************************************************
