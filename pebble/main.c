@@ -18,10 +18,6 @@ static int last_time2 = 0;
 static int sleeptime = 10000; // number of milliseconds to sleep
 static int ispolling = 0;
 
-
-
-//static const int CELSIUS = 0;
-//static const int FAHRENHEIT = 1;
 static const int POLL  = 12;
 static const int AVGC = 2;
 static const int AVGF = 3; 
@@ -36,9 +32,7 @@ void send_req();
 void rgb();
 void polling();
 
-
-
-
+/* This method will be called after registering a timer after the 10 seconds */
 static void timer_callback(void *data) { 
     text_layer_set_text_alignment(hello_layer, GTextAlignmentCenter);
     DictionaryIterator *iter;
@@ -56,14 +50,11 @@ void out_sent_handler(DictionaryIterator *sent, void *context) {
    
 }
 
-
 void out_failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
-  
    text_layer_set_text(hello_layer, "Error out!");
-
 }
 
-// Handles all messages received from server
+/* Handles all messages received from server */
 void in_received_handler(DictionaryIterator *received, void *context) {
    // incoming message received 
   
@@ -218,17 +209,6 @@ void up_long_click_handler(ClickRecognizerRef recognizer, void *context) {
   }
 }
 
-// /* This called when the up button is double clicked. */
-// void up_double_click_handler(ClickRecognizerRef recognizer, void *context) {
-//     int key = last_time;
-//     DictionaryIterator *iter;
-//     app_message_outbox_begin(&iter);
-//     Tuplet value = TupletCString(key, "msg");
-//     dict_write_tuplet(iter, &value);
-//     app_message_outbox_send();
-// }
-
-
 //switch to the RGB light mode
 void rgb() {
    DictionaryIterator *iter;
@@ -264,16 +244,6 @@ void down_long_click_handler(ClickRecognizerRef recognizer, void *context) {
     dict_write_tuplet(iter, &value);
     app_message_outbox_send();
 }
-
-// /* This called when the down button is double clicked. */
-// void down_double_click_handler(ClickRecognizerRef recognizer, void *context) {
-//     int key = last_time;
-//     DictionaryIterator *iter;
-//     app_message_outbox_begin(&iter);
-//     Tuplet value = TupletCString(key, "msg");
-//     dict_write_tuplet(iter, &value);
-//     app_message_outbox_send();
-// }
 
 /* this registers the appropriate function to the appropriate button */
 void config_provider(void *context) {

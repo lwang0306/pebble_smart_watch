@@ -192,7 +192,12 @@ void loop()
   }
 } 
 
+/***************************************************************************
+ Function Name: Light_Changing
 
+ Purpose: 
+   Flashed the RBG bulb for 8 seconds.
+****************************************************************************/
 void Light_Changing() {
   
   if (Light_Counter % 4 == 0) { // no color

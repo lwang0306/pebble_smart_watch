@@ -20,7 +20,6 @@
 
 using namespace std;
 
-// global variables
 char* ARDUINO_PORT;
 int exit_code;
 pthread_mutex_t lock_exit;
@@ -55,12 +54,11 @@ int start_server(int);
 void* read_input_from_console(void*);
 void* read_from_arduino(void*);
 
+/**The method updates the queue to maintain the temperatures in the past an hour*/
 void updateQueue() {
-	//std::size_t offset = 0;
 	float celcius = 0;
 	float current = 0;
 	float previous = 0;
-	//m = std::stod(&data[2], &offset);
 	if (num_msg[0] != '\0' && num_msg[0] != '\n') {
 		string str(num_msg);
 		int index_of_c_f = str.length() - 1;
@@ -82,15 +80,14 @@ void updateQueue() {
 			temperatures.pop();
 		}
 		current = celcius;
-		//cout << "Now the temperature is " << current << endl;
 		updateAverage(previous, current);
 		updateLowest(previous, current);
 		updateHighest(previous, current);
 	}
 }
 
+/** The method updates the average temperature in the past hour.*/
 void updateAverage(float previous, float current) {
-	//string str(num_msg);
 	if (num_msg[0] != '\0') {
 		if (temperatures.size() < size) {
 
@@ -106,9 +103,9 @@ void updateAverage(float previous, float current) {
 			}
 		}
 	}
-	// cout << "The average now is "<< average << endl;
 }
 
+/** The method updates the lowest temperature in the past hour. */
 void updateLowest(float previous, float current) {
 	if (num_msg[0] != '\0') {
 		if (temperatures.size() < size) {
@@ -133,9 +130,9 @@ void updateLowest(float previous, float current) {
 			}
 		}
 	}
-	// cout << "The lowest now is " << lowest << endl;
 }
 
+/** The method updates the highest temperature in the past hour.*/
 void updateHighest(float previous, float current) {
 	if (num_msg[0] != '\0') {
 		if (temperatures.size() < size) {
@@ -160,36 +157,10 @@ void updateHighest(float previous, float current) {
 			}
 		}
 	}
-	// cout << "The highest now is " << highest << endl;
 }
 
 
-
-// int main() {
-// 	strcpy(all_msg, "26.67 c");
-// 	updateQueue();
-// 	strcpy(all_msg, "87.75 f");
-// 	updateQueue();
-// 	strcpy(all_msg, "32.24 c");
-// 	updateQueue();
-// 	strcpy(all_msg, "75.25 f");
-// 	updateQueue();
-// 	strcpy(all_msg, "25.55 c");
-// 	updateQueue();
-// 	strcpy(all_msg, "15.66 c");
-// 	updateQueue();
-// 	strcpy(all_msg, "22.30 c");
-// 	updateQueue();
-// 	// while (temperatures.size() > 0) {
-// 	// 	float first = temperatures.front();
-// 	// 	cout << "The first one is now "<< first << endl;
-// 	// 	temperatures.pop();
-// 	// }
-// 	return 0;
-// }
-
-
-
+/** This method returns a char array to get the information from the request. */
 char* get_information_from_request(char* request, char* filename)
 {
 	int i = 5;
@@ -203,6 +174,7 @@ char* get_information_from_request(char* request, char* filename)
 	return filename;
 }
 
+/** This method sends the message from server to file. */
 void send_message(int fd, char* message) {
   char header [] = "HTTP/1.1 200 OK\nContent-Type: text/html\n\n\0";
   successful_pages++;
@@ -214,6 +186,7 @@ void send_message(int fd, char* message) {
   cout << "Server sent message: " << content << endl;
 }
 
+/** This method starts the server. */
 int start_server(int PORT_NUMBER)
 {
   // structs to represent the server and client
@@ -316,7 +289,7 @@ int start_server(int PORT_NUMBER)
   		continue;
   	}
 
-    // case and error handling
+    // cases and error handling
     if (strcmp(filename_tail, "resume") == 0 || strcmp(filename_tail, "polling") == 0) {
       write(arduino, "1", 1);
       // char all_msg [200];
@@ -344,7 +317,6 @@ int start_server(int PORT_NUMBER)
       send_message(fd, all_msg);
     } else if (strcmp(filename_tail, "celsius") == 0) {
       write(arduino, "3", 1);
-      // char all_msg [200];
       all_msg[0] = '\0';
       strcat(all_msg, previous);
       pthread_mutex_lock(&lock_message);
@@ -359,7 +331,6 @@ int start_server(int PORT_NUMBER)
       send_message(fd, all_msg);
     } else if (strcmp(filename_tail, "fahrenheit") == 0) {
       write(arduino, "4", 1);
-      // char all_msg [200];
       all_msg[0] = '\0';
       strcat(all_msg, previous);
       pthread_mutex_lock(&lock_message);
@@ -459,6 +430,7 @@ int start_server(int PORT_NUMBER)
   return 0;
 } 
 
+/** This method reads input from console, it is primarily used to stop the server. */
 void* read_input_from_console(void* p)
 {
   string input;
@@ -473,11 +445,10 @@ void* read_input_from_console(void* p)
 	pthread_exit(NULL);
 }
 
+/** This method reads information from arduino. */
 void* read_from_arduino(void* p) {
   // open the connection
-  // cout << ARDUINO_PORT << endl;
   arduino = open(ARDUINO_PORT, O_RDWR);
-  // cout << "arduino = " << arduino << endl;
   // if open returns -1, something went wrong!
   if (arduino == -1) return NULL;
   bool is_garbage = true;
@@ -555,18 +526,18 @@ int main(int argc, char *argv[])
 	total_bytes = 0;
 	num_msg[0] = '\0';
 	int PORT_NUMBER = atoi(argv[1]);
-  // ARDUINO_PORT = argv[2];
 	ARDUINO_PORT = "/dev/cu.usbmodem1431";
 
 	pthread_mutex_init(&lock_exit, NULL);
-  pthread_mutex_init(&lock_message, NULL);
+    pthread_mutex_init(&lock_message, NULL);
 	pthread_t read_thread;
-  pthread_t t1;
+    pthread_t t1;
 
 	pthread_create(&read_thread, NULL, &read_input_from_console, NULL);
-  pthread_create(&t1, NULL, &read_from_arduino, NULL);
+    pthread_create(&t1, NULL, &read_from_arduino, NULL);
 	start_server(PORT_NUMBER);
 	pthread_join(read_thread, NULL);
-  pthread_join(t1, NULL);
+    pthread_join(t1, NULL);
 
 }
+

@@ -8,7 +8,7 @@ var statc = "statc";
 var statf = "statf";
 var polling = "polling";
 
-
+/* Listener is triggered when buttons is pressed or clicked */
 Pebble.addEventListener("appmessage",
   function(e) {
     if (e.payload) {
@@ -34,34 +34,11 @@ Pebble.addEventListener("appmessage",
       }
 });
 
-// function sendToServer(part) {
-//   console.log(part);
-//   var req = new XMLHttpRequest();
-// 	var ipAddress = "158.130.109.148"; // Hard coded IP address
-// 	var port = "3001"; // Same port specified as argument to server
-// 	var url = "http://" + ipAddress + ":" + port + "/";
-// 	var method = "GET";
-// 	var async = true;
-//   console.log(url + part);
-//   Pebble.sendAppMessage({ "0": part});
-// }
-
-// function sendToServer2(part) {
-//   console.log(part);
-//   var req = new XMLHttpRequest();
-// 	var ipAddress = "158.130.109.148"; // Hard coded IP address
-// 	var port = "3001"; // Same port specified as argument to server
-// 	var url = "http://" + ipAddress + ":" + port + "/";
-// 	var method = "GET";
-// 	var async = true;
-//   console.log(url + part);
-//   Pebble.sendAppMessage({ "0": part});
-// }
-
+/* send request to server and get reply and send to the phone */
 function sendToServer(part) {
 
 	var req = new XMLHttpRequest();
-	var ipAddress = "165.123.216.173"; // Hard coded IP address
+	var ipAddress = "158.130.104.2"; // Hard coded IP address
 	var port = "3001"; // Same port specified as argument to server
 	var url = "http://" + ipAddress + ":" + port + "/";
 	var method = "GET";
@@ -97,34 +74,5 @@ function sendToServer(part) {
 //   req.timeout = 3000;
   req.send(null);
 }
-
-// function sendToServer2(part) {
-
-// 	var req = new XMLHttpRequest();
-// 	var ipAddress = "165.123.216.173"; // Hard coded IP address
-// 	var port = "3001"; // Same port specified as argument to server
-// 	var url = "http://" + ipAddress + ":" + port + "/";
-// 	var method = "GET";
-// 	var async = true;
-  
-// 	req.onload = function(e) {
-//                    var msg = "no response";
-//                    msg = part;
-// //                 console.log(req.responseText);
-// //                 var response = JSON.parse(req.responseText);
-// //                 console.log(response);
-// //                 if (response) {
-// //                     if (response.name) {
-// //                         msg = response.name;
-// //                     }
-// //                     else msg = "no message has been received!";
-// //                 }
-                
-//                    Pebble.sendAppMessage({ "0": msg });
-           
-// 	};
-//   req.open(method, url + part, async);
-//   req.send(null);
-// }
 
 
